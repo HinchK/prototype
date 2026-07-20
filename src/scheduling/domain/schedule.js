@@ -130,12 +130,12 @@ export function scheduleReducer(state, action) {
     }
 
     case 'moved': {
+      const destKey = slotKey(action.blockId, action.day)
+      if (!(destKey in state.week.slots) || state.week.slots[destKey].includes(action.staffId))
+        return state
       const from = removeFrom(state.week, action.staffId, action.fromBlockId, action.fromDay)
       if (from === state.week) return state
-      const week = assignTo(from, action.staffId, action.blockId, action.day)
-      // Dropping back onto the origin slot (from === removed, assign refused
-      // as duplicate-free re-add) still lands: assignTo re-adds cleanly.
-      return { ...state, week }
+      return { ...state, week: assignTo(from, action.staffId, action.blockId, action.day) }
     }
 
     case 'call-out-toggled': {
@@ -151,13 +151,15 @@ export function scheduleReducer(state, action) {
       }
     }
 
-    case 'rule-updated':
+    case 'rule-updated': {
+      if (!state.rulebook.some((r) => r.id === action.ruleId)) return state
       return {
         ...state,
         rulebook: state.rulebook.map((r) =>
           r.id === action.ruleId ? { ...r, params: { ...r.params, ...action.params } } : r,
         ),
       }
+    }
 
     case 'reset':
       return action.state

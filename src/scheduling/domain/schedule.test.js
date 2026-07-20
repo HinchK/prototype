@@ -95,4 +95,18 @@ describe('week state', () => {
     s = scheduleReducer(s, { type: 'call-out-toggled', staffId: 'rosa', day: 'Mon' })
     expect(staffWeekHours(s.week, 'rosa')).toBe(0)
   })
+
+  it('moved with an unknown or already-occupied destination is a no-op', () => {
+    const s = state()
+    expect(scheduleReducer(s, { type: 'moved', staffId: 'rosa', fromBlockId: 'surgery', fromDay: 'Mon', blockId: 'nope', day: 'Mon' })).toBe(s)
+    expect(scheduleReducer(s, { type: 'moved', staffId: 'rosa', fromBlockId: 'surgery', fromDay: 'Mon', blockId: 'surgery', day: 'Mon' })).toBe(s)
+  })
+
+  it('rule-updated with an unknown ruleId is a no-op', () => {
+    const s0 = createScheduleState({
+      assignments: {},
+      rulebook: [{ id: 'r1', type: 'min-role-coverage', severity: 'hard', params: { count: 1 }, rationale: '' }],
+    })
+    expect(scheduleReducer(s0, { type: 'rule-updated', ruleId: 'nope', params: { count: 2 } })).toBe(s0)
+  })
 })

@@ -47,7 +47,10 @@ src/
   wrapping `<DragHandle id>` sources and `<DropZone id>` targets. Ids are
   opaque strings; drop validity is the caller's rule (reject in `onDrop`).
   Pointer drags activate after 4px so inner buttons stay clickable; keyboard
-  dragging is built in (focus handle, Space lifts, arrows move, Space drops).
+  dragging is built in (focus handle, Space lifts, arrow keys jump zone to
+  zone via a droppable-snapping coordinate getter, Space drops). Interactive
+  elements nested inside a DragHandle must stopPropagation on
+  pointerdown/keydown so they don't start a drag.
 - **toast** — `useToasts()` → `{ toasts, notify(message, tone), dismiss }` +
   `<Toaster>`; tones `success | error | info`; auto-dismiss with cleanup.
 

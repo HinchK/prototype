@@ -13,6 +13,8 @@ cancels a drag if React remounts the dragged node mid-gesture.
   (today the triage board, later the resource timeline) encode meaning in ids
   and enforce drop validity themselves — zones are never disabled engine-side.
 - Pointer drags require 4px of travel before activating so buttons inside
-  draggable cards keep working; keyboard dragging (Space/arrows) comes free.
+  draggable cards keep working. Keyboard dragging needs a custom coordinate
+  getter (dnd-kit's default only nudges 25px per arrow press); the engine
+  ships one that snaps zone to zone.
 - Anything dnd-kit-specific stays inside the module; swapping engines again
   would touch one file.

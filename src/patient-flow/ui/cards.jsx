@@ -53,6 +53,7 @@ export function WalkInCard({
             <button
               aria-label={`Assign ${walkIn.pet} without dragging`}
               onClick={onToggleMenu}
+              onKeyDown={(e) => e.stopPropagation()}
               className="hover:text-primary focus-visible:ring-primary-hover -mr-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-slate-400 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
               <MoreVertical size={15} />
@@ -62,8 +63,18 @@ export function WalkInCard({
 
           {menuOpen && (
             <>
-              <div className="fixed inset-0 z-10" onClick={onCloseMenu} />
-              <div className="absolute top-9 right-2 z-20 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+              {/* stopPropagation: keep menu interactions from reaching the
+                  DragHandle's sensors and starting an accidental drag */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={onCloseMenu}
+                onPointerDown={(e) => e.stopPropagation()}
+              />
+              <div
+                className="absolute top-9 right-2 z-20 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
                 <p className="px-2 pt-1.5 pb-1 text-[10px] font-bold tracking-wide text-slate-400 uppercase">
                   Send to room
                 </p>

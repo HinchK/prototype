@@ -1,4 +1,9 @@
-export const cn = (...classes) => classes.filter(Boolean).join(' ')
+// Design system primitives — West Coast Animal Hospital.
+// Tokens (slate-blue palette, Open Sans) live in src/index.css under @theme;
+// these components are the shadcn/ui-idiom surface every context builds on.
+import { cn } from './cn'
+
+export { cn }
 
 const BUTTON_VARIANTS = {
   default: 'bg-primary text-white shadow-sm hover:bg-primary-hover',

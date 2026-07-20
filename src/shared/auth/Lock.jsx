@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Lock as LockIcon, Delete, CheckCircle2 } from 'lucide-react'
-import { Avatar, cn } from '../ui'
+import { Avatar, cn } from '../ui/primitives'
 import Backdrop from './Backdrop'
 
 const PIN = '1234'
@@ -37,12 +37,13 @@ export default function Lock({ onUnlock, onSignOut }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (/^[0-9]$/.test(e.key)) press(e.key)
-      if (e.key === 'Backspace') back()
+      if (state !== 'idle') return
+      if (/^[0-9]$/.test(e.key)) setEntry((entry) => (entry.length < 4 ? entry + e.key : entry))
+      if (e.key === 'Backspace') setEntry((entry) => entry.slice(0, -1))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
+  }, [state])
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto p-4">

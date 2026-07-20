@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PawPrint, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
-import { Button, Input } from '../ui'
+import { Button, Input } from '../ui/primitives'
 import Backdrop from './Backdrop'
 
 export default function Landing({ onSignIn }) {

@@ -7,6 +7,7 @@ import { Badge, Button, cn } from '../../shared/ui/primitives'
 import { RULE_TEMPLATES } from '../domain/rules'
 import { DAYS, blockById } from '../domain/catalog'
 import { isCalledOut, slotKey, staffDayBlocks } from '../domain/schedule'
+import { backfillCandidates } from '../domain/absorption'
 
 const SEVERITY_BADGE = { hard: 'danger', soft: 'warning' }
 
@@ -66,24 +67,25 @@ function RulebookMode({ state, actions }) {
   )
 }
 
-function coverageRepairs(violation, state, staff, weekHours, rulebook) {
+function coverageRepairs(violation, state, staffById) {
   // For a coverage violation, suggest bench-light staff who satisfy the rule.
-  const rule = rulebook.find((r) => r.id === violation.ruleId)
+  // Reuses the domain's own back-fill filtering (absorption.js) so a suggested
+  // candidate can never be called out that day, hard-unavailable, over their
+  // weekly cap, or otherwise trip a fresh hard violation — then narrows the
+  // safe set down to whoever actually satisfies the rule's requirement.
+  const rule = state.rulebook.find((r) => r.id === violation.ruleId)
   if (!rule || violation.slotKeys.length !== 1) return null
   const [blockId, day] = violation.slotKeys[0].split(':')
   const need = rule.params.credential ?? null
   const role = rule.params.role ?? null
-  const inSlot = state.week.slots[violation.slotKeys[0]]
-  const candidates = staff.filter(
-    (m) =>
-      !inSlot.includes(m.id) &&
-      (need ? m.credentials.includes(need) : m.role === role) &&
-      staffDayBlocks(state.week, m.id, day).length === 0,
-  )
+  const safeIds = backfillCandidates(state.week, state.rulebook, staffById, blockId, day, null)
+  const candidates = safeIds
+    .filter((id) => (need ? staffById[id].credentials.includes(need) : staffById[id].role === role))
+    .map((id) => staffById[id])
   return { blockId, day, candidates }
 }
 
-function ViolationMode({ violations, selection, onSelect, state, staff, staffById, weekHours, actions }) {
+function ViolationMode({ violations, selection, onSelect, state, staffById, weekHours, actions }) {
   const index = Math.min(selection.index, violations.length - 1)
   if (index < 0)
     return (
@@ -96,7 +98,7 @@ function ViolationMode({ violations, selection, onSelect, state, staff, staffByI
   const v = violations[index]
   const rule = state.rulebook.find((r) => r.id === v.ruleId)
   const repairs = ['min-role-coverage', 'min-credential-coverage'].includes(v.type)
-    ? coverageRepairs(v, state, staff, weekHours, state.rulebook)
+    ? coverageRepairs(v, state, staffById)
     : null
   return (
     <>
@@ -128,6 +130,7 @@ function ViolationMode({ violations, selection, onSelect, state, staff, staffByI
                   <span className="text-xs font-semibold">{m.name}</span>
                   <span className="text-[10px] text-slate-400">{weekHours[m.id]}h this week</span>
                   <Button size="sm" className="ml-auto h-6 px-2 text-[11px]"
+                    aria-label={`Assign ${m.name}`}
                     onClick={() => actions.assign(m.id, repairs.blockId, repairs.day)}>
                     Assign
                   </Button>
@@ -184,6 +187,7 @@ function StaffMode({ staffId, state, staffById, absorb, weekHours, actions }) {
             <button
               key={day}
               type="button"
+              aria-pressed={out}
               onClick={() => actions.toggleCallOut(member.id, day)}
               className={cn(
                 'cursor-pointer rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors',
@@ -202,7 +206,7 @@ function StaffMode({ staffId, state, staffById, absorb, weekHours, actions }) {
   )
 }
 
-export function RulebookRail({ state, staff, staffById, violations, absorb, weekHours, selection, onSelect, actions }) {
+export function RulebookRail({ state, staffById, violations, absorb, weekHours, selection, onSelect, actions }) {
   return (
     <aside className="glass-panel flex max-h-[44rem] w-80 shrink-0 flex-col gap-2 self-start rounded-xl p-3">
       {selection && (
@@ -214,7 +218,7 @@ export function RulebookRail({ state, staff, staffById, violations, absorb, week
       {selection?.kind === 'violation' && (
         <ViolationMode
           violations={violations} selection={selection} onSelect={onSelect}
-          state={state} staff={staff} staffById={staffById} weekHours={weekHours} actions={actions}
+          state={state} staffById={staffById} weekHours={weekHours} actions={actions}
         />
       )}
       {selection?.kind === 'staff' && (

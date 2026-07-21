@@ -10,6 +10,14 @@
   --color-charcoal: #454545;
   --color-success: #d4edda;
   --color-success-text: #155724;
+  /* Coastal Glass — the practice-intelligence dashboard's dark surface.
+     Scoped to that screen; the rest of the portal stays light slate. */
+  --color-coast-deep: #0b1e2d;
+  --color-coast-mid: #123f56;
+  --color-coast-dark: #0d2b3e;
+  --color-coast-accent: #5eead4;
+  --color-coast-accent-soft: #99f6e4;
+
   --color-glass: rgb(255 255 255 / 0.55);
   --color-glass-strong: rgb(255 255 255 / 0.75);
   --color-glass-border: rgb(255 255 255 / 0.45);
@@ -73,6 +81,21 @@ body {
    Glass is chrome, not content: grid cells stay opaque for legibility. */
 .glass-panel {
   @apply bg-glass border-glass-border border shadow-sm backdrop-blur-md;
+}
+
+/* Coastal Glass surfaces — the dark counterpart, used only by the
+   practice-intelligence dashboard. Frosted panels over an ocean gradient. */
+.coast-bg {
+  background: linear-gradient(
+    135deg,
+    var(--color-coast-deep) 0%,
+    var(--color-coast-mid) 45%,
+    var(--color-coast-dark) 100%
+  );
+}
+.coast-panel {
+  @apply rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {

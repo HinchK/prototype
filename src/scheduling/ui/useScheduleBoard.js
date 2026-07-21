@@ -7,6 +7,10 @@ import { BLOCKS } from '../domain/catalog'
 import { scheduleReducer, effectiveSlots } from '../domain/schedule'
 import { evaluateWeek, violationsBySlot } from '../domain/rules'
 import { absorption } from '../domain/absorption'
+import { scheduleHealth } from '../domain/health'
+import { archetypeMix, dayChemistry } from '../domain/chemistry'
+import { suggestMoves } from '../domain/suggestions'
+import { DAYS } from '../domain/catalog'
 import { STAFF, STAFF_BY_ID, createSeededState } from '../data/clinic'
 
 // One effectiveSlots pass covers all 58 staff; per-staff staffWeekHours would
@@ -50,6 +54,21 @@ export function useScheduleBoard(notify) {
     }
   }, [state, violations, absorb])
 
+  // Practice-intelligence layer: the dashboard's numbers, all computed.
+  const health = useMemo(
+    () => scheduleHealth(state.week, state.rulebook, STAFF_BY_ID),
+    [state],
+  )
+  const chemistryByDay = useMemo(
+    () => DAYS.map((day) => ({ day, chemistry: dayChemistry(state.week, day, STAFF_BY_ID) })),
+    [state],
+  )
+  const suggestions = useMemo(
+    () => suggestMoves(state.week, state.rulebook, STAFF_BY_ID),
+    [state],
+  )
+  const mix = useMemo(() => archetypeMix(STAFF), [])
+
   const actions = {
     assign(staffId, blockId, day) {
       dispatch({ type: 'assigned', staffId, blockId, day })
@@ -69,11 +88,30 @@ export function useScheduleBoard(notify) {
       dispatch({ type: 'rule-updated', ruleId, params })
       notify('Rule updated — re-checking the whole week.', 'info')
     },
+    // A suggestion's `apply` is an ordered list of real reducer actions
+    // (a swap is vacate-then-fill), so dispatch them in order.
+    applySuggestion(suggestion) {
+      for (const action of suggestion.apply) dispatch(action)
+      notify(`${suggestion.title} applied — re-scoring the week.`, 'success')
+    },
     reset() {
       dispatch({ type: 'reset', state: createSeededState() })
       notify('Board reset to the seeded week.', 'success')
     },
   }
 
-  return { state, staffById: STAFF_BY_ID, violations, bySlot, absorb, weekHours, stats, actions }
+  return {
+    state,
+    staffById: STAFF_BY_ID,
+    violations,
+    bySlot,
+    absorb,
+    weekHours,
+    stats,
+    health,
+    chemistryByDay,
+    suggestions,
+    mix,
+    actions,
+  }
 }

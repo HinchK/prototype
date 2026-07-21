@@ -3,7 +3,7 @@
 // here, panels/rail from siblings. Mirrors TriageBoard's { hidden, onLock }
 // prop contract so src/app can mount both contexts symmetrically.
 import { useState } from 'react'
-import { CalendarRange, Lock as LockIcon, RotateCcw } from 'lucide-react'
+import { CalendarRange, ChevronLeft, Lock as LockIcon, RotateCcw } from 'lucide-react'
 import { Button, cn } from '../../shared/ui/primitives'
 import { useToasts, Toaster } from '../../shared/toast/toast'
 import { DragDropBoard } from '../../shared/dnd/engine'
@@ -14,12 +14,18 @@ import { CoverageGrid } from './CoverageGrid'
 import { VitalsBar, DemandStrip, Bench } from './panels'
 import { RulebookRail } from './rail'
 import { ChipDragPreview } from './chips'
+import Dashboard from './Dashboard'
 import { STAFF } from '../data/clinic'
 
 export default function ScheduleBoard({ hidden, onLock }) {
   const { toasts, notify, dismiss } = useToasts()
-  const { state, staffById, violations, bySlot, absorb, weekHours, stats, actions } =
-    useScheduleBoard(notify)
+  const {
+    state, staffById, violations, bySlot, absorb, weekHours, stats,
+    health, chemistryByDay, suggestions, mix, actions,
+  } = useScheduleBoard(notify)
+  // 'overview' is the front door; the Coverage Board is the drill-down where
+  // the actual editing happens. Both read the same live state.
+  const [view, setView] = useState('overview')
   // selection: null | {kind:'violation', index} | {kind:'staff', id}
   const [selection, setSelection] = useState(null)
   const [activeDragId, setActiveDragId] = useState(null)
@@ -57,14 +63,60 @@ export default function ScheduleBoard({ hidden, onLock }) {
     return staff ? <ChipDragPreview staff={staff} /> : null
   }
 
+  // The overview is its own dark surface; it shares state with the board but
+  // not its chrome, so it renders as an early return rather than a sub-branch.
+  if (view === 'overview') {
+    return (
+      <div className={cn('coast-bg min-h-screen font-sans text-white', hidden && 'hidden')}>
+        <div className="mx-auto max-w-6xl px-6 pt-8 pb-20">
+          <header className="mb-8 flex items-center gap-3">
+            <CalendarRange className="text-coast-accent h-6 w-6" />
+            <h1 className="text-lg font-bold">Staff Scheduling</h1>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={actions.reset}
+                className="coast-panel cursor-pointer px-3 py-1.5 text-xs font-bold hover:bg-white/15"
+              >
+                <RotateCcw className="mr-1 inline h-3.5 w-3.5" /> Reset demo
+              </button>
+              <button
+                type="button"
+                onClick={onLock}
+                aria-label="Lock screen"
+                className="coast-panel cursor-pointer px-3 py-2 hover:bg-white/15"
+              >
+                <LockIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </header>
+          <Dashboard
+            health={health}
+            chemistryByDay={chemistryByDay}
+            suggestions={suggestions}
+            mix={mix}
+            staff={STAFF}
+            weekHours={weekHours}
+            onApply={actions.applySuggestion}
+            onOpenBoard={() => setView('board')}
+          />
+        </div>
+        <Toaster toasts={toasts} onDismiss={dismiss} />
+      </div>
+    )
+  }
+
   return (
     <div className={cn('from-primary/10 via-cream to-accent/10 min-h-screen bg-gradient-to-br', hidden && 'hidden')}>
       <DragDropBoard onDrop={handleDrop} preview={dragPreview} onActiveChange={setActiveDragId}>
         <div className="mx-auto flex max-w-[110rem] flex-col gap-3 p-4">
           <header className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setView('overview')}>
+              <ChevronLeft className="h-4 w-4" /> Overview
+            </Button>
             <CalendarRange className="text-primary h-6 w-6" />
             <div>
-              <h1 className="text-charcoal text-lg font-bold">Staff Scheduling</h1>
+              <h1 className="text-charcoal text-lg font-bold">Coverage Board</h1>
               <p className="text-xs text-slate-500">
                 Week of Mar 9 · Dana's rulebook, running live — drops land, then flag
               </p>

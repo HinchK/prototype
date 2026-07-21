@@ -10,6 +10,9 @@
   --color-charcoal: #454545;
   --color-success: #d4edda;
   --color-success-text: #155724;
+  --color-glass: rgb(255 255 255 / 0.55);
+  --color-glass-strong: rgb(255 255 255 / 0.75);
+  --color-glass-border: rgb(255 255 255 / 0.45);
 }
 
 body {
@@ -64,6 +67,12 @@ body {
 }
 .animate-shake {
   animation: shake 0.45s ease-in-out;
+}
+
+/* Slate Clinic with Glass — frosted chrome for the scheduling context.
+   Glass is chrome, not content: grid cells stay opaque for legibility. */
+.glass-panel {
+  @apply bg-glass border-glass-border border shadow-sm backdrop-blur-md;
 }
 
 @media (prefers-reduced-motion: reduce) {

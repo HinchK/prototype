@@ -12,9 +12,11 @@
 // the substitute's own week. The score is not a worst-case-k guarantee.
 import { blockById, blocksOverlap } from './catalog'
 import { assignTo, effectiveSlots, isCalledOut, removeFrom, slotKey, staffDayBlocks } from './schedule'
-import { evaluateWeek } from './rules'
+import { evaluateWeek, newHardViolations } from './rules'
 
-const countHard = (violations) => violations.filter((v) => v.severity === 'hard').length
+// Substituting must introduce no NEW hard violation. Compared by identity, not
+// by count: a swap that closes the coverage gap while breaking a different rule
+// nets to zero and a count check would accept it.
 
 /**
  * @param {import('./schedule').Week} week
@@ -23,18 +25,33 @@ const countHard = (violations) => violations.filter((v) => v.severity === 'hard'
  * @param {string} blockId @param {string} day @param {string} absentId
  * @returns {string[]} staff ids that could cover this assignment
  */
-export function backfillCandidates(week, rulebook, staffById, blockId, day, absentId) {
-  const baseline = countHard(evaluateWeek(week, rulebook, staffById))
+export function backfillCandidates(week, rulebook, staffById, blockId, day, absentId, precomputedBaseline) {
+  // Only hard rules can disqualify a substitute, and only those that touch
+  // THIS block or are person-scoped can change when one person moves into one
+  // slot. Coverage rules for other blocks are identical before and after, so
+  // evaluating them per candidate is pure waste — and this runs once per
+  // candidate per assignment, which is where the cost lives.
+  const relevant = rulebook.filter(
+    (r) => r.severity === 'hard' && (r.params.blockId === undefined || r.params.blockId === blockId),
+  )
+  const baseline = (precomputedBaseline ?? evaluateWeek(week, rulebook, staffById)).filter((v) =>
+    relevant.some((r) => r.id === v.ruleId),
+  )
   const vacated = removeFrom(week, absentId, blockId, day)
   const target = blockById(blockId)
   const slotIds = effectiveSlots(week)[slotKey(blockId, day)]
 
   return Object.keys(staffById).filter((id) => {
+    // Cheap disqualifiers first — the rule evaluation below is the expensive
+    // step and most people are excluded before reaching it.
     if (id === absentId || slotIds.includes(id) || isCalledOut(week, id, day)) return false
     const busy = staffDayBlocks(vacated, id, day)
     if (busy.some((b) => blocksOverlap(blockById(b), target))) return false
     const withSub = assignTo(vacated, id, blockId, day)
-    return countHard(evaluateWeek(withSub, rulebook, staffById)) <= baseline
+    // Only this candidate's own hours/rest can newly break; everyone else's
+    // schedule is untouched by the substitution.
+    const after = evaluateWeek(withSub, relevant, staffById, { staffScope: [id] })
+    return newHardViolations(baseline, after).length === 0
   })
 }
 
@@ -49,10 +66,12 @@ export function absorption(week, rulebook, staffById) {
   let absorbable = 0
   let total = 0
   const eff = effectiveSlots(week)
+  // The week does not change during the sweep, so its violations are constant.
+  const baseline = evaluateWeek(week, rulebook, staffById)
   for (const [key, ids] of Object.entries(eff)) {
     const [blockId, day] = key.split(':')
     for (const staffId of ids) {
-      const candidates = backfillCandidates(week, rulebook, staffById, blockId, day, staffId)
+      const candidates = backfillCandidates(week, rulebook, staffById, blockId, day, staffId, baseline)
       perAssignment[`${key}:${staffId}`] = { absorbable: candidates.length > 0, candidates }
       total += 1
       if (candidates.length > 0) absorbable += 1

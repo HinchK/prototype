@@ -220,13 +220,9 @@ export default function Dashboard({ health, monthHealth, horizonGrid, suggestion
         <div className="coast-panel flex items-center gap-6 p-6 lg:col-span-5">
           <HealthRing value={monthHealth.score} />
           <div className="min-w-0 flex-1 space-y-3">
-            <VitalRow label="Coverage" value={`${monthHealth.coverage}%`} />
-            <VitalRow
-              label="Weekend equity"
-              value={monthHealth.fairness}
-              note={`${health.fairness} in W1 alone`}
-            />
-            <VitalRow label="Chemistry" value={monthHealth.chemistry} />
+            <VitalRow label="Coverage" value={`${monthHealth.coverage}%`} note={`W1 ${health.coverage}%`} />
+            <VitalRow label="Weekend equity" value={monthHealth.fairness} note={`W1 ${health.fairness}`} />
+            <VitalRow label="Chemistry" value={monthHealth.chemistry} note={`W1 ${health.chemistry}`} />
             <VitalRow label="Burnout alerts" value={monthHealth.burnout} />
             <VitalRow label="Unfilled shifts" value={monthHealth.unfilled} />
           </div>
@@ -241,7 +237,9 @@ export default function Dashboard({ health, monthHealth, horizonGrid, suggestion
         <div className="coast-panel p-5">
           <h3 className="mb-4 flex items-center gap-2 text-sm font-bold">
             <ArrowLeftRight className="text-coast-accent h-4 w-4" /> Suggested moves
-            <span className="ml-auto text-[11px] font-normal text-white/40">impact is measured, not estimated</span>
+            <span className="ml-auto text-[11px] font-normal text-white/40">
+              measured against W1 — the editable week
+            </span>
           </h3>
           <div className="space-y-2.5">
             {suggestions.length === 0 && (

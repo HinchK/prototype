@@ -102,9 +102,16 @@ export const staffDayBlocks = (week, staffId, day) => {
   return BLOCKS.filter((b) => eff[slotKey(b.id, day)].includes(staffId)).map((b) => b.id)
 }
 
-/** @param {Week} week @param {string} staffId @returns {number} */
-export const staffWeekHours = (week, staffId) => {
-  const eff = effectiveSlots(week)
+/**
+ * @param {Week} week @param {string} staffId
+ * @param {Record<string, string[]>} [precomputed] Effective slots, when the
+ *   caller already has them. Callers that loop over staff MUST pass this:
+ *   rebuilding effectiveSlots per person is the difference between a 2ms and a
+ *   3-second rule evaluation once call-outs are active.
+ * @returns {number}
+ */
+export const staffWeekHours = (week, staffId, precomputed) => {
+  const eff = precomputed ?? effectiveSlots(week)
   let hours = 0
   for (const [key, ids] of Object.entries(eff)) {
     if (ids.includes(staffId)) hours += blockById(key.split(':')[0]).hours

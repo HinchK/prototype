@@ -43,6 +43,37 @@ describe('backfillCandidates', () => {
   })
 })
 
+describe('no-new-violation guarantee', () => {
+  // Regression: comparing violation COUNTS let a candidate through who closed
+  // the coverage gap while breaking a different rule — the net was zero. On the
+  // demo's own rule-editing beat this offered a hard-unavailable person as a
+  // "repair". Compare identity, not totals.
+  it('rejects a candidate who is hard-unavailable that day, even though they close the gap', () => {
+    const staff = [
+      makeStaff({ name: 'Rosa', role: 'Tech', credentials: ['LVT', 'LVT-A'] }, 'rosa'),
+      makeStaff({ name: 'Imani', role: 'Tech', credentials: ['LVT', 'LVT-A'] }, 'imani'),
+    ]
+    const byId = Object.fromEntries(staff.map((s) => [s.id, s]))
+    const rulebook = [
+      makeRule({
+        id: 'r-anesthesia', type: 'min-credential-coverage', severity: 'hard',
+        params: { blockId: 'surgery', credential: 'LVT-A', count: 1, days: ['Thu'] },
+        rationale: 'Anesthesia needs its own hands.',
+      }),
+      makeRule({
+        id: 'r-unavail', type: 'hard-unavailability', severity: 'hard',
+        params: { staffId: 'imani', days: ['Thu'] },
+        rationale: 'Imani has clinicals Thursdays.',
+      }),
+    ]
+    // Empty surgery slot: assigning Imani would satisfy the credential rule
+    // (-1 violation) but breach her unavailability (+1) — net zero.
+    const week = createWeek({ [slotKey('surgery', 'Thu')]: [] })
+    expect(backfillCandidates(week, rulebook, byId, 'surgery', 'Thu', null)).not.toContain('imani')
+    expect(backfillCandidates(week, rulebook, byId, 'surgery', 'Thu', null)).toEqual(['rosa'])
+  })
+})
+
 describe('absorption', () => {
   it('scores every effective assignment', () => {
     const week = createWeek({ [slotKey('surgery', 'Thu')]: ['rosa'], [slotKey('midday', 'Mon')]: ['priya'] })

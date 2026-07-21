@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSeededState, STAFF_BY_ID } from '../data/clinic'
 import { scheduleReducer } from './schedule'
 import { scheduleHealth } from './health'
+import { createHorizon, horizonHealth } from './horizon'
 import { suggestMoves } from './suggestions'
 
 const seeded = () => createSeededState()
@@ -58,6 +59,33 @@ describe('suggestMoves on the seeded week', () => {
           `${move.id} ${label} ${actual > 0 ? '+' : ''}${actual}${unit}`,
         )
       }
+    }
+  })
+
+  // The anti-theater test above validates against scheduleHealth. The
+  // Dashboard renders monthHealth beside these badges, and nothing forced the
+  // two to agree — a badge read "Chemistry +1" while the displayed month
+  // chemistry did not move. Badges are measured on W1 (the editable week) BY
+  // DESIGN; this pins that contract so the UI must keep saying so.
+  it('measures against the single editable week, not the month horizon', () => {
+    const s = seeded()
+    const move = suggestMoves(s.week, s.rulebook, STAFF_BY_ID)[0]
+    const before = scheduleHealth(s.week, s.rulebook, STAFF_BY_ID)
+    const applied = move.apply.reduce((state, action) => scheduleReducer(state, action), s)
+    const afterWeek = scheduleHealth(applied.week, s.rulebook, STAFF_BY_ID)
+
+    const monthBefore = horizonHealth(createHorizon(s.week, STAFF_BY_ID, s.rulebook), s.rulebook, STAFF_BY_ID)
+    const monthAfter = horizonHealth(
+      createHorizon(applied.week, STAFF_BY_ID, s.rulebook), s.rulebook, STAFF_BY_ID,
+    )
+
+    const chem = move.impact.find((i) => i.label === 'Chemistry')
+    if (chem) {
+      expect(`${afterWeek.chemistry - before.chemistry}`).toBe(chem.delta.replace('+', ''))
+      // Documents the divergence rather than asserting the two agree: the
+      // month dilutes a single week's change, which is why the UI labels the
+      // badges "measured against W1".
+      expect(monthAfter.chemistry - monthBefore.chemistry).not.toBeNaN()
     }
   })
 

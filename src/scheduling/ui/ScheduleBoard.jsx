@@ -8,7 +8,7 @@ import { Button, cn } from '../../shared/ui/primitives'
 import { useToasts, Toaster } from '../../shared/toast/toast'
 import { DragDropBoard } from '../../shared/dnd/engine'
 import { assignTo, removeFrom } from '../domain/schedule'
-import { evaluateWeek } from '../domain/rules'
+import { evaluateWeek, newHardViolations } from '../domain/rules'
 import { useScheduleBoard } from './useScheduleBoard'
 import { CoverageGrid } from './CoverageGrid'
 import { VitalsBar, DemandStrip, Bench } from './panels'
@@ -41,9 +41,11 @@ export default function ScheduleBoard({ hidden, onLock }) {
     const week = assignTo(base, staffId, blockId, day)
     if (week === base) return 'ok' // already in the slot
     const after = evaluateWeek(week, state.rulebook, staffById)
-    const count = (list, severity) => list.filter((v) => v.severity === severity).length
-    if (count(after, 'hard') > count(violations, 'hard')) return 'hard'
-    if (count(after, 'soft') > count(violations, 'soft')) return 'soft'
+    // Identity, not count: a drop that closes one gap while breaking a
+    // different rule nets to zero and would glow green.
+    if (newHardViolations(violations, after).length > 0) return 'hard'
+    const softCount = (list) => list.filter((v) => v.severity === 'soft').length
+    if (softCount(after) > softCount(violations)) return 'soft'
     return 'ok'
   }
 

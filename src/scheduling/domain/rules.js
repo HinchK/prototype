@@ -79,8 +79,8 @@ export const RULE_TEMPLATES = {
     paramFields: [{ name: 'maxHours', label: 'Max hours/week', kind: 'count' }],
     evaluate(rule, ctx) {
       const out = []
-      for (const id of Object.keys(ctx.staffById)) {
-        const hours = staffWeekHours(ctx.week, id)
+      for (const id of ctx.staffScope) {
+        const hours = staffWeekHours(ctx.week, id, ctx.eff)
         if (hours > rule.params.maxHours)
           out.push(violation(rule, `${nameOf(ctx.staffById, id)} is at ${hours}h — cap is ${rule.params.maxHours}h.`, [], [id]))
       }
@@ -94,7 +94,7 @@ export const RULE_TEMPLATES = {
     paramFields: [],
     evaluate(rule, ctx) {
       const out = []
-      for (const id of Object.keys(ctx.staffById)) {
+      for (const id of ctx.staffScope) {
         for (let i = 0; i < DAYS.length - 1; i++) {
           const closes = CLOSING_BLOCKS.find((b) => ctx.eff[slotKey(b, DAYS[i])]?.includes(id))
           const opens = OPENING_BLOCKS.find((b) => ctx.eff[slotKey(b, DAYS[i + 1])]?.includes(id))
@@ -237,9 +237,45 @@ export const makeRule = (fields) => ({
  * @param {Record<string, import('./schedule').StaffMember>} staffById
  * @returns {{ruleId: string, type: string, severity: 'hard' | 'soft', message: string, slotKeys: string[], staffIds: string[]}[]}
  */
-export function evaluateWeek(week, rulebook, staffById) {
-  const ctx = { eff: effectiveSlots(week), week, staffById }
+export function evaluateWeek(week, rulebook, staffById, options = {}) {
+  const ctx = {
+    eff: effectiveSlots(week),
+    week,
+    staffById,
+    // Person-scoped rules (hours caps, rest gaps) walk this list. Narrowing it
+    // is a pure optimization for callers asking a targeted question — "does
+    // moving THIS person here break anything?" — where checking the other 57
+    // staff re-derives an answer that cannot have changed. Semantics are
+    // unaffected for the people in scope.
+    staffScope: options.staffScope ?? Object.keys(staffById),
+  }
   return rulebook.flatMap((rule) => RULE_TEMPLATES[rule.type]?.evaluate(rule, ctx) ?? [])
+}
+
+/**
+ * Identity of a violation — which rule failed, where, about whom.
+ * @param {{ruleId: string, slotKeys: string[], staffIds: string[]}} v
+ */
+export const violationKey = (v) => `${v.ruleId}@${v.slotKeys.join('+')}|${v.staffIds.join('+')}`
+
+/**
+ * Hard violations present in `after` that are not in `before`, compared by
+ * IDENTITY rather than count.
+ *
+ * Counting is not good enough and the difference is not academic: a change that
+ * repairs one violation while creating a different one nets to zero, so a
+ * count check waves it through. That is how a candidate who is hard-unavailable
+ * gets offered as a "repair" for a coverage gap — the gap closes, their
+ * unavailability opens, the total is unchanged, and the UI reports only the
+ * upside. Compare what actually broke, not how many things broke.
+ *
+ * @param {ReturnType<typeof evaluateWeek>} before
+ * @param {ReturnType<typeof evaluateWeek>} after
+ * @returns {ReturnType<typeof evaluateWeek>}
+ */
+export function newHardViolations(before, after) {
+  const known = new Set(before.filter((v) => v.severity === 'hard').map(violationKey))
+  return after.filter((v) => v.severity === 'hard' && !known.has(violationKey(v)))
 }
 
 /** @param {ReturnType<typeof evaluateWeek>} violations @returns {Record<string, 'hard' | 'soft'>} */

@@ -172,5 +172,120 @@ UI verified through the browser pane against the demo script.
 ## Out of scope
 
 Bid market and stable-matching pass (epic phase 4), real PIMS integration
-(phase 5), persistence, multi-week/rotation views, auth changes, any
-patient-flow domain coupling.
+(phase 5), persistence, auth changes, any patient-flow domain coupling.
+
+---
+
+# Amendment 1 — the Coastal Glass pivot (2026-07-21)
+
+*Everything above describes the build as shipped through Task 8 and remains
+accurate about the Coverage Board. This amendment records what changed and why.
+It is written as an amendment rather than a rewrite because the original
+decisions were correct given what was known, and the reason they changed is the
+most useful thing in this document.*
+
+## What prompted it
+
+A prior session had built a four-variant design exploration on branch
+`prototype/style-variants`, including a "Coastal Glass" scheduling dashboard:
+personality archetypes, a chemistry heatmap, schedule health, suggested moves.
+Commit `846321c` removed it from main as a **palette** exploration — its message
+records the verdict as "slate-blue, Open Sans, shadcn idiom." But
+`src/prototype/data.js` held a product model, not a palette.
+
+Three things then compounded the loss during this build:
+
+1. `CLAUDE.md` and the session memory both described the branch as style-only.
+2. Epic spec §1 explicitly instructs that the earlier prototype's "domain,
+   state, and logic" must **not** carry over — only auth, dnd, and the design
+   system.
+3. Nobody checked out the branch. The design above was derived from the epic
+   spec's prose, and the scoping question offered three options all carved from
+   that same phasing. Porting the existing prototype was never on the menu.
+
+**Lesson worth keeping:** a commit message that records a verdict ("we chose
+slate-blue") can silently discard everything else in the artifact it removed.
+When a branch is preserved "as the primary source," read it before building
+adjacent to it.
+
+## Decision: augment, not replace
+
+`GlassVariant.jsx` is **read-only** — no drag-drop, no rulebook editor, no
+call-out toggle. Replacing the Coverage Board with it would have deleted the
+elicitation surface that is the epic's entire thesis (§0: the judgment becomes
+inspectable policy anyone can run).
+
+So: the dashboard is the **front door**, the Coverage Board the **drill-down**.
+Both read the same live state. The dashboard sells the system; the board does
+the work.
+
+## What the pivot added
+
+| Module | Purpose |
+|---|---|
+| `domain/chemistry.js` | Archetypes, symmetric synergy matrix, slot/day/week chemistry |
+| `domain/health.js` | Composite score, burnout streaks, weekend equity |
+| `domain/suggestions.js` | Generated moves with measured impact |
+| `domain/horizon.js` | Four-week horizon; weeks 2–4 as projections |
+| `ui/Dashboard.jsx` | The Coastal Glass surface |
+
+## Decisions that shaped it
+
+**Chemistry is a metric, never a Violation.** It colors the heatmap and drives
+suggestions; it does not make a schedule invalid. Wiring it into `evaluateWeek`
+would also break `data/clinic.test.js`'s exact planted-defect assertion — that
+test is the deliberate tripwire.
+
+**Impact is measured, not asserted.** Every suggestion badge is produced by
+simulating the move and diffing health components. The prototype's
+`Client CSAT +8` and `Risk −34%` were dropped: nothing in the system can compute
+them. A suggestion's `apply` is an *ordered list* of real reducer actions
+because a swap is genuinely vacate-then-fill — collapsing it into one invented
+action type let a badge describe a change the reducer could not perform. Caught
+by strengthening the test to dispatch every suggestion rather than one.
+
+**Weekend equity uses a Gini coefficient, not max−min.** Max−min saturates to 0
+on any ordinary roster — one person working two weekend shifts while anyone
+works none reports "maximally unfair" for a perfectly normal week.
+
+**Weeks 2–4 are projections, not invented data.** Four hand-authored weeks
+would be four times the fiction with no more truth in it. Deriving them from
+week 1 (weekend duty rotated across credential-preserving peers) means
+repairing week 1 improves the whole month — verified: one coverage fill took
+month-wide unfilled 4 → 0.
+
+**Projections are rulebook-validated.** Rotating Saturday's openers pulls in
+Friday closers — a day the rotation deliberately leaves alone — tripping the
+rest-gap rule. Offending weekend slots revert, and a test asserts the
+introduced-violation set is exactly empty, not merely "no worse."
+
+**Month equity is pooled, not averaged.** Averaging per-week equity would hide
+the fact the horizon exists to reveal: 60 across the month against 33 in week 1
+alone.
+
+**Coastal palette lives in `@theme`.** The variant was ~40 hardcoded colors; the
+`coast-*` tokens plus `.coast-bg` / `.coast-panel` keep the repo's token rule
+intact. Heatmap opacity normalizes to the week's own min–max, since a real
+week's chemistry spans a narrow band and a 0–100 mapping renders every tile
+identical.
+
+## Known limitations
+
+- Rest gaps and burnout streaks are measured within a week and do not cross
+  horizon boundaries (closing Sunday of W1 into opening Monday of W2 does not
+  flag). Fixing this makes the horizon one continuous 28-day structure.
+- `backfillCandidates` guarantees *no net increase* in hard violations, not
+  "this candidate trips nothing new" — filling one gap can offset a different
+  new violation.
+- Archetype assignments are hand-authored fiction, as is the synergy matrix.
+  Real phase-1 extraction would replace both.
+
+## Revised demo script
+
+1. Land on the dashboard — month health, 4×7 chemistry heatmap, equity 60 for
+   the month against 33 for week 1 alone.
+2. Apply a suggested move — headline numbers shift by exactly the badge values;
+   the suggestion list regenerates.
+3. Open the Coverage Board — the same repair is already reflected in the grid.
+4. Beats 2–5 of the original script (violation rail, rule edit cascade,
+   call-out simulation) run unchanged from there.

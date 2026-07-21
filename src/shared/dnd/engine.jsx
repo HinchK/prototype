@@ -9,6 +9,8 @@
 // - Ids are opaque strings; encode domain meaning in them and parse in onDrop.
 //   onDrop fires only when a drag ends over a zone.
 // - preview renders the floating card that follows the pointer (DragOverlay).
+// - onActiveChange (optional) reports the active drag id (or null) so callers
+//   can render drop-target feedback that depends on WHAT is being dragged.
 // - Pointer drags need 4px of travel before activating, so clicks on buttons
 //   inside a DragHandle still work. Keyboard dragging: focus the handle,
 //   Space/Enter lifts, arrow keys jump zone to zone, Space/Enter drops.
@@ -72,8 +74,12 @@ function snapToDroppable(event, { currentCoordinates, context: { collisionRect, 
 const POINTER_OPTIONS = { activationConstraint: { distance: 4 } }
 const KEYBOARD_OPTIONS = { coordinateGetter: snapToDroppable }
 
-export function DragDropBoard({ onDrop, preview, children }) {
+export function DragDropBoard({ onDrop, preview, onActiveChange, children }) {
   const [activeId, setActiveId] = useState(null)
+  const setActive = (id) => {
+    setActiveId(id)
+    onActiveChange?.(id)
+  }
   const sensors = useSensors(
     useSensor(PointerSensor, POINTER_OPTIONS),
     useSensor(KeyboardSensor, KEYBOARD_OPTIONS),
@@ -82,10 +88,10 @@ export function DragDropBoard({ onDrop, preview, children }) {
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={({ active }) => setActiveId(String(active.id))}
-      onDragCancel={() => setActiveId(null)}
+      onDragStart={({ active }) => setActive(String(active.id))}
+      onDragCancel={() => setActive(null)}
       onDragEnd={({ active, over }) => {
-        setActiveId(null)
+        setActive(null)
         if (over) onDrop(String(active.id), String(over.id))
       }}
     >

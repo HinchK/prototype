@@ -29,7 +29,7 @@
 //   horizonHealth(weeks, rulebook, staffById)  -> { perWeek, score, coverage, fairness, chemistry, burnout, unfilled }
 import { DAYS } from './catalog'
 import { effectiveSlots } from './schedule'
-import { evaluateWeek } from './rules'
+import { evaluateWeek, violationKey } from './rules'
 import { dayChemistry } from './chemistry'
 import { scheduleHealth } from './health'
 
@@ -103,28 +103,49 @@ export function deriveWeek(base, staffById, offset, rulebook = []) {
   let projected = { slots, callOuts: [] }
   if (rulebook.length === 0) return projected
 
-  // Revert any weekend slot implicated in a hard violation the base week did
-  // not already have. Repeat until stable — reverting one slot can clear
-  // several violations, and never makes things worse, so this converges.
-  const hardKeys = (week) =>
-    new Set(
-      evaluateWeek(week, rulebook, staffById)
-        .filter((v) => v.severity === 'hard')
-        .flatMap((v) => v.slotKeys),
-    )
-  const baseline = hardKeys(base)
+  const weekendKeys = Object.keys(base.slots).filter((k) => WEEKEND.some((d) => k.endsWith(`:${d}`)))
+  const baseline = evaluateWeek(base, rulebook, staffById)
 
-  for (let pass = 0; pass < WEEKEND.length + 1; pass++) {
-    const offenders = [...hardKeys(projected)].filter(
-      (key) => !baseline.has(key) && WEEKEND.some((d) => key.endsWith(`:${d}`)),
-    )
-    if (offenders.length === 0) break
+  /** Weekend slots this staffer occupies — how a week-scoped violation is traced back. */
+  const weekendSlotsOf = (week, staffId) =>
+    weekendKeys.filter((k) => week.slots[k].includes(staffId))
+
+  /**
+   * Weekend slots implicated in a hard violation the base week does NOT have,
+   * compared by violation identity rather than by slot.
+   *
+   * Week-scoped violations need the staffIds fallback: `max-weekly-hours`
+   * reports `slotKeys: []` because a cap is breached by a person's whole week,
+   * not one shift. Scanning slotKeys alone therefore cannot see it, and a
+   * rotation that pushes a peer over their cap would ship that violation into
+   * the projection unnoticed.
+   */
+  const offendingSlots = (week) => {
+    const known = new Set(baseline.filter((v) => v.severity === 'hard').map(violationKey))
+    const out = new Set()
+    for (const v of evaluateWeek(week, rulebook, staffById)) {
+      if (v.severity !== 'hard' || known.has(violationKey(v))) continue
+      const implicated = v.slotKeys.length > 0 ? v.slotKeys : v.staffIds.flatMap((id) => weekendSlotsOf(week, id))
+      for (const key of implicated) if (weekendKeys.includes(key)) out.add(key)
+    }
+    return out
+  }
+
+  // Revert offending weekend slots until none remain. Reverting is monotone —
+  // a reverted slot holds its base staffing and full reversion is exactly the
+  // base week — so this terminates; the bound is one pass per weekend slot.
+  for (let pass = 0; pass <= weekendKeys.length; pass++) {
+    const offenders = offendingSlots(projected)
+    if (offenders.size === 0) return projected
     const reverted = { ...projected.slots }
     for (const key of offenders) reverted[key] = base.slots[key]
     projected = { slots: reverted, callOuts: [] }
   }
 
-  return projected
+  // Unreachable given the monotonicity argument above, but a projection that
+  // still carries an invented problem is worse than no rotation at all: fall
+  // back to the base week rather than shipping one.
+  return offendingSlots(projected).size === 0 ? projected : base
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSeededState, STAFF_BY_ID } from '../data/clinic'
-import { evaluateWeek } from './rules'
+import { evaluateWeek, makeRule } from './rules'
 import { HORIZON_WEEKS, createHorizon, deriveWeek, horizonChemistry, horizonHealth } from './horizon'
 
 const seeded = () => createSeededState()
@@ -98,6 +98,57 @@ describe('createHorizon', () => {
     for (const week of createHorizon(s.week, STAFF_BY_ID, s.rulebook).slice(1)) {
       const introduced = signature(week).filter((v) => !base.has(v))
       expect(introduced).toEqual([])
+    }
+  })
+})
+
+describe('week-scoped violations are visible to the revert loop', () => {
+  // Regression: the offender scan flat-mapped v.slotKeys, but max-weekly-hours
+  // reports slotKeys: [] — a cap is breached by a person's whole week, not one
+  // shift. A rotation pushing a peer over their cap was therefore structurally
+  // invisible and shipped into the projection.
+  it('never projects a new max-weekly-hours breach', () => {
+    const s = seeded()
+    // A cap tight enough that rotation can push someone past it.
+    const tight = [
+      makeRule({
+        id: 'r-tight-hours', type: 'max-weekly-hours', severity: 'hard',
+        params: { maxHours: 12 }, rationale: 'Tight cap for the regression.',
+      }),
+    ]
+    const baseBreaches = new Set(
+      evaluateWeek(s.week, tight, STAFF_BY_ID).map((v) => `${v.ruleId}|${v.staffIds.join('+')}`),
+    )
+    for (let offset = 1; offset < HORIZON_WEEKS; offset++) {
+      const projected = deriveWeek(s.week, STAFF_BY_ID, offset, tight)
+      const introduced = evaluateWeek(projected, tight, STAFF_BY_ID)
+        .map((v) => `${v.ruleId}|${v.staffIds.join('+')}`)
+        .filter((k) => !baseBreaches.has(k))
+      expect(introduced, `offset ${offset}`).toEqual([])
+    }
+  })
+
+  it('falls back to the base week rather than shipping an invented problem', () => {
+    // Contract check: whatever the rulebook, a projection's hard violations are
+    // always a subset of the base week's.
+    const s = seeded()
+    const signature = (week, rules) =>
+      new Set(
+        evaluateWeek(week, rules, STAFF_BY_ID)
+          .filter((v) => v.severity === 'hard')
+          .map((v) => `${v.ruleId}@${v.slotKeys.join('+')}|${v.staffIds.join('+')}`),
+      )
+    for (const rules of [s.rulebook, [...s.rulebook, makeRule({
+      id: 'r-harsh', type: 'max-weekly-hours', severity: 'hard',
+      params: { maxHours: 8 }, rationale: 'Harsher than anyone can meet.',
+    })]]) {
+      const base = signature(s.week, rules)
+      for (let offset = 1; offset < HORIZON_WEEKS; offset++) {
+        const introduced = [...signature(deriveWeek(s.week, STAFF_BY_ID, offset, rules), rules)].filter(
+          (k) => !base.has(k),
+        )
+        expect(introduced, `offset ${offset}`).toEqual([])
+      }
     }
   })
 })

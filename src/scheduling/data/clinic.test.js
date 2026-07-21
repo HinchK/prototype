@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { slotKey } from '../domain/schedule'
 import { evaluateWeek } from '../domain/rules'
 import { absorption } from '../domain/absorption'
+import { ARCHETYPES } from '../domain/chemistry'
 import { RULEBOOK, STAFF, STAFF_BY_ID, createSeededState } from './clinic'
 
 const state = createSeededState()
@@ -18,6 +19,12 @@ describe('the fictional clinic', () => {
     expect(count((s) => s.role === 'CSR' && !s.float)).toBe(9)
     expect(count((s) => s.role === 'Kennel' && !s.float)).toBe(6)
     expect(count((s) => s.float)).toBe(9)
+  })
+
+  it('gives every staff member a known archetype', () => {
+    for (const m of STAFF) {
+      expect(Object.keys(ARCHETYPES), `${m.id} archetype`).toContain(m.archetype)
+    }
   })
 
   it('rulebook rules all reference real staff and templates', () => {

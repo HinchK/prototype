@@ -15,7 +15,34 @@ import { makeRule } from '../domain/rules'
 const s = (id, name, role, credentials = [], float = false) =>
   makeStaff({ name, role, credentials, float }, id)
 
-export const STAFF = [
+// How each person shows up on the floor — the other half of Dana's judgment,
+// the part she'd phrase as "don't put those two on together." Hand-assigned
+// (never random) so the chemistry heatmap tells a stable, defensible story:
+// surgery days are Analyst/Anchor-heavy, the front desk skews Empath, and the
+// Sat surgery seam that the rulebook flags is ALSO the week's weakest pairing.
+const ARCHETYPE_OF = {
+  // DVMs — surgeons skew Analyst, ER-minded doctors Shield
+  gibbings: 'Analyst', okafor: 'Shield', reyes: 'Anchor', calloway: 'Analyst',
+  nassar: 'Empath', ito: 'Spark', brennan: 'Anchor', whitaker: 'Analyst',
+  // Techs — the anesthesia five are deliberately spread across archetypes
+  rosa: 'Anchor', imani: 'Analyst', chen: 'Analyst', noor: 'Shield', sana: 'Spark',
+  marisol: 'Anchor', jenna: 'Empath', tasha: 'Spark', oliver: 'Anchor',
+  quinn: 'Analyst', hector: 'Spark', bree: 'Empath', sam: 'Shield', priya: 'Empath',
+  // Assistants
+  ava: 'Spark', ben: 'Anchor', carla: 'Empath', dev: 'Analyst', elle: 'Empath',
+  finn: 'Spark', gus: 'Anchor', hana: 'Analyst', iris: 'Empath', jo: 'Anchor',
+  kai: 'Shield', luz: 'Spark',
+  // CSRs — the lobby runs on Empaths
+  mabel: 'Empath', nico: 'Spark', opal: 'Empath', pete: 'Anchor', rae: 'Empath',
+  sof: 'Analyst', tam: 'Empath', uma: 'Anchor', vic: 'Shield',
+  // Kennel
+  wes: 'Anchor', xio: 'Spark', yara: 'Empath', zane: 'Anchor', abe: 'Analyst', nell: 'Shield',
+  // Float pool
+  tran: 'Shield', wren: 'Anchor', jules: 'Spark', kit: 'Empath', remy: 'Analyst',
+  sol: 'Empath', max: 'Spark', ash: 'Anchor', bo: 'Analyst',
+}
+
+const RAW_STAFF = [
   // DVMs (8)
   s('gibbings', 'Dr. Gibbings', 'DVM', ['DVM']),
   s('okafor', 'Dr. Okafor', 'DVM', ['DVM']),
@@ -68,6 +95,8 @@ export const STAFF = [
   s('ash', 'Ash Varga', 'Kennel', [], true),
   s('bo', 'Bo Nakamura', 'Kennel', [], true),
 ]
+
+export const STAFF = RAW_STAFF.map((m) => ({ ...m, archetype: ARCHETYPE_OF[m.id] }))
 
 export const STAFF_BY_ID = Object.fromEntries(STAFF.map((m) => [m.id, m]))
 

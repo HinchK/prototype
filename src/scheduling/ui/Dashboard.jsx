@@ -39,11 +39,14 @@ function HealthRing({ value }) {
   )
 }
 
-function VitalRow({ label, value }) {
+function VitalRow({ label, value, note }) {
   return (
-    <div className="flex items-center justify-between gap-8">
+    <div className="flex items-baseline justify-between gap-6">
       <span className="text-xs text-white/60">{label}</span>
-      <span className="text-coast-accent text-sm font-bold tabular-nums">{value}</span>
+      <span className="flex items-baseline gap-2">
+        {note && <span className="text-[10px] text-white/35">{note}</span>}
+        <span className="text-coast-accent text-sm font-bold tabular-nums">{value}</span>
+      </span>
     </div>
   )
 }
@@ -58,38 +61,62 @@ function heatAlpha(value, lo, hi) {
   return 0.12 + ((value - lo) / (hi - lo)) * 0.63
 }
 
-function ChemistryHeatmap({ chemistryByDay, mix }) {
-  const scored = chemistryByDay.map((d) => d.chemistry).filter((c) => c !== null)
+function ChemistryHeatmap({ horizonGrid, mix }) {
+  const scored = horizonGrid.flatMap((w) => w.days.map((d) => d.chemistry)).filter((c) => c !== null)
   const lo = scored.length ? Math.min(...scored) : 0
   const hi = scored.length ? Math.max(...scored) : 0
+  const dayLabels = horizonGrid[0]?.days.map((d) => d.day) ?? []
+
   return (
     <div className="coast-panel p-6">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-bold">Chemistry by day · week of Mar 9</h3>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-bold">Chemistry heatmap · four weeks from Mar 9</h3>
         <span className="text-[11px] text-white/50">brighter = better pairing</span>
       </div>
-      <div className="flex items-end gap-1.5">
-        {chemistryByDay.map(({ day, chemistry }) => (
-          <div key={day} className="flex-1">
-            <div
-              title={chemistry === null ? `${day} · no paired shifts` : `${day} · chemistry ${chemistry}`}
-              className="flex h-16 items-end justify-center rounded-lg"
-              style={{
-                background:
+
+      <div className="flex gap-1.5 pl-7">
+        {dayLabels.map((day) => (
+          <span key={day} className="flex-1 text-center text-[10px] text-white/40">
+            {day}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-1 space-y-1.5">
+        {horizonGrid.map(({ week, days }) => (
+          <div key={week} className="flex items-center gap-1.5">
+            <span className="w-5.5 shrink-0 text-[10px] text-white/40">W{week}</span>
+            {days.map(({ day, chemistry }) => (
+              <div
+                key={day}
+                title={
                   chemistry === null
-                    ? 'rgb(255 255 255 / 0.05)'
-                    : `rgb(94 234 212 / ${heatAlpha(chemistry, lo, hi)})`,
-              }}
-            >
-              <span className="pb-1 text-[11px] font-semibold text-white/80 tabular-nums">
-                {chemistry ?? '—'}
-              </span>
-            </div>
-            <p className="pt-1 text-center text-[10px] text-white/50">{day}</p>
+                    ? `W${week} ${day} · no paired shifts`
+                    : `W${week} ${day} · chemistry ${chemistry}`
+                }
+                className="flex h-9 flex-1 items-center justify-center rounded-lg"
+                style={{
+                  background:
+                    chemistry === null
+                      ? 'rgb(255 255 255 / 0.05)'
+                      : `rgb(94 234 212 / ${heatAlpha(chemistry, lo, hi)})`,
+                }}
+              >
+                <span className="text-[10px] font-semibold text-white/80 tabular-nums">
+                  {chemistry ?? '—'}
+                </span>
+              </div>
+            ))}
           </div>
         ))}
       </div>
-      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/50">
+
+      <p className="mt-2 text-[10px] text-white/40">
+        W1 is the live week. W2–W4 project its pattern with weekend duty rotated — repair W1 and the
+        month follows.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/50">
         {mix.map((a) => (
           <span key={a.key} className="flex items-center gap-1" title={ARCHETYPES[a.key].blurb}>
             <span className="h-2 w-2 rounded-full" style={{ background: a.color }} /> {a.key} {a.count}
@@ -157,7 +184,7 @@ function StaffLoadRow({ member, hours, max }) {
   )
 }
 
-export default function Dashboard({ health, chemistryByDay, suggestions, mix, staff, weekHours, onApply, onOpenBoard }) {
+export default function Dashboard({ health, monthHealth, horizonGrid, suggestions, mix, staff, weekHours, onApply, onOpenBoard }) {
   const busiest = [...staff]
     .filter((m) => weekHours[m.id] > 0)
     .sort((a, b) => weekHours[b.id] - weekHours[a.id])
@@ -172,11 +199,12 @@ export default function Dashboard({ health, chemistryByDay, suggestions, mix, st
             <BrainCircuit className="h-4 w-4" /> Practice intelligence
           </p>
           <h2 className="mt-1 text-4xl font-light tracking-tight">
-            The week, <span className="font-bold">already scored</span>
+            The month, <span className="font-bold">already scored</span>
           </h2>
           <p className="mt-2 max-w-xl text-sm text-white/60">
-            58 staff across 8 blocks — weighted by credential coverage, team chemistry, burnout risk,
-            and weekend equity. Every number below is computed from the live schedule.
+            58 staff, 8 blocks, four weeks out — scored on credential coverage, team chemistry,
+            burnout risk, and weekend equity. Every number here is computed from the live schedule,
+            not estimated.
           </p>
         </div>
         <button
@@ -190,18 +218,22 @@ export default function Dashboard({ health, chemistryByDay, suggestions, mix, st
 
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="coast-panel flex items-center gap-6 p-6 lg:col-span-5">
-          <HealthRing value={health.score} />
+          <HealthRing value={monthHealth.score} />
           <div className="min-w-0 flex-1 space-y-3">
-            <VitalRow label="Coverage" value={`${health.coverage}%`} />
-            <VitalRow label="Weekend equity" value={health.fairness} />
-            <VitalRow label="Chemistry" value={health.chemistry} />
-            <VitalRow label="Burnout alerts" value={health.burnout} />
-            <VitalRow label="Unfilled shifts" value={health.unfilled} />
+            <VitalRow label="Coverage" value={`${monthHealth.coverage}%`} />
+            <VitalRow
+              label="Weekend equity"
+              value={monthHealth.fairness}
+              note={`${health.fairness} in W1 alone`}
+            />
+            <VitalRow label="Chemistry" value={monthHealth.chemistry} />
+            <VitalRow label="Burnout alerts" value={monthHealth.burnout} />
+            <VitalRow label="Unfilled shifts" value={monthHealth.unfilled} />
           </div>
         </div>
 
         <div className="lg:col-span-7">
-          <ChemistryHeatmap chemistryByDay={chemistryByDay} mix={mix} />
+          <ChemistryHeatmap horizonGrid={horizonGrid} mix={mix} />
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import { absorption } from '../domain/absorption'
 import { scheduleHealth } from '../domain/health'
 import { archetypeMix, dayChemistry } from '../domain/chemistry'
 import { suggestMoves } from '../domain/suggestions'
+import { createHorizon, horizonChemistry, horizonHealth } from '../domain/horizon'
 import { DAYS } from '../domain/catalog'
 import { STAFF, STAFF_BY_ID, createSeededState } from '../data/clinic'
 
@@ -63,6 +64,17 @@ export function useScheduleBoard(notify) {
     () => DAYS.map((day) => ({ day, chemistry: dayChemistry(state.week, day, STAFF_BY_ID) })),
     [state],
   )
+  // The month: week 1 is the live editable week, weeks 2-4 are projections of
+  // it, so repairing week 1 improves the whole horizon.
+  const horizon = useMemo(
+    () => createHorizon(state.week, STAFF_BY_ID, state.rulebook),
+    [state],
+  )
+  const horizonGrid = useMemo(() => horizonChemistry(horizon, STAFF_BY_ID), [horizon])
+  const monthHealth = useMemo(
+    () => horizonHealth(horizon, state.rulebook, STAFF_BY_ID),
+    [horizon, state.rulebook],
+  )
   const suggestions = useMemo(
     () => suggestMoves(state.week, state.rulebook, STAFF_BY_ID),
     [state],
@@ -110,6 +122,8 @@ export function useScheduleBoard(notify) {
     stats,
     health,
     chemistryByDay,
+    horizonGrid,
+    monthHealth,
     suggestions,
     mix,
     actions,

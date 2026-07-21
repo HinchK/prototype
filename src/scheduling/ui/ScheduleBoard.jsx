@@ -21,7 +21,7 @@ export default function ScheduleBoard({ hidden, onLock }) {
   const { toasts, notify, dismiss } = useToasts()
   const {
     state, staffById, violations, bySlot, absorb, weekHours, stats,
-    health, chemistryByDay, suggestions, mix, actions,
+    health, horizonGrid, monthHealth, suggestions, mix, actions,
   } = useScheduleBoard(notify)
   // 'overview' is the front door; the Coverage Board is the drill-down where
   // the actual editing happens. Both read the same live state.
@@ -92,7 +92,8 @@ export default function ScheduleBoard({ hidden, onLock }) {
           </header>
           <Dashboard
             health={health}
-            chemistryByDay={chemistryByDay}
+            monthHealth={monthHealth}
+            horizonGrid={horizonGrid}
             suggestions={suggestions}
             mix={mix}
             staff={STAFF}

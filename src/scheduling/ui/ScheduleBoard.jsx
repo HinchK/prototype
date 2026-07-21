@@ -7,7 +7,7 @@ import { CalendarRange, Lock as LockIcon, RotateCcw } from 'lucide-react'
 import { Button, cn } from '../../shared/ui/primitives'
 import { useToasts, Toaster } from '../../shared/toast/toast'
 import { DragDropBoard } from '../../shared/dnd/engine'
-import { assignTo } from '../domain/schedule'
+import { assignTo, removeFrom } from '../domain/schedule'
 import { evaluateWeek } from '../domain/rules'
 import { useScheduleBoard } from './useScheduleBoard'
 import { CoverageGrid } from './CoverageGrid'
@@ -28,8 +28,12 @@ export default function ScheduleBoard({ hidden, onLock }) {
   // report the worst NEW consequence. One evaluateWeek per hovered cell —
   // cheap at demo scale.
   const hoverCheck = (staffId, blockId, day) => {
-    const week = assignTo(state.week, staffId, blockId, day)
-    if (week === state.week) return 'ok' // already in the slot
+    const drag = activeDragId?.split(':') ?? []
+    // A cell→cell move vacates the source slot first; assignTo alone would
+    // double-count the staffer in both slots and misreport the ring.
+    const base = drag[0] === 'cell' ? removeFrom(state.week, drag[1], drag[2], drag[3]) : state.week
+    const week = assignTo(base, staffId, blockId, day)
+    if (week === base) return 'ok' // already in the slot
     const after = evaluateWeek(week, state.rulebook, staffById)
     const count = (list, severity) => list.filter((v) => v.severity === severity).length
     if (count(after, 'hard') > count(violations, 'hard')) return 'hard'

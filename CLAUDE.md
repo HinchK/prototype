@@ -29,8 +29,9 @@ and [CONTEXT-MAP.md](./CONTEXT-MAP.md) before restructuring anything.
 ## Current state
 
 - Demo auth: any credentials sign in; lock-screen PIN is `1234`.
-- The scheduling context is a documented placeholder — the epic (see
-  `~/Downloads/scheduling-epic-spec.md`, to be moved in-repo when work starts)
-  has NOT begun; don't scaffold it ad hoc.
+- The scheduling context is a DEMO build (spec: `docs/scheduling-epic-spec.md`,
+  design: `docs/superpowers/specs/2026-07-20-scheduling-demo-design.md`).
+  All clinic facts (roster, rulebook, week) are fictitious-but-plausible by
+  directive; real phase-1 rule extraction has not happened.
 - Style history: branch `prototype/style-variants` holds the four-variant
   design exploration; the chosen system is the current slate-blue + Open Sans.

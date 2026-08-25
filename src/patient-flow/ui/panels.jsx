@@ -1,5 +1,4 @@
 // Secondary triage-board views: the completed-visits log and settings.
-import { useState } from 'react'
 import { FileText } from 'lucide-react'
 import { Card, Badge, cn } from '../../shared/ui/primitives'
 import { doctorById } from '../domain/catalog'
@@ -57,9 +56,9 @@ export function LogsView({ completedLog }) {
   )
 }
 
-export function SettingsPanel() {
-  const [settings, setSettings] = useState({ autoAssign: false, sounds: true, hints: true })
-  const set = (k) => (v) => setSettings((s) => ({ ...s, [k]: v }))
+// Controlled: state lives in TriageBoard so toggles survive tab switches.
+export function SettingsPanel({ settings, onChange }) {
+  const set = (k) => (v) => onChange({ ...settings, [k]: v })
   return (
     <div className="max-w-2xl p-4 lg:p-6">
       <Card className="divide-y divide-slate-100 p-4">

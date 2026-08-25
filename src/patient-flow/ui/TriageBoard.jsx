@@ -48,6 +48,7 @@ export default function TriageBoard({ hidden, onLock }) {
   const [collapsed, setCollapsed] = useState(false)
   const [query, setQuery] = useState('')
   const [menuFor, setMenuFor] = useState(null)
+  const [settings, setSettings] = useState({ autoAssign: false, sounds: true, hints: true })
 
   const { toasts, notify, dismiss } = useToasts()
   const { board, actions } = useTriageBoard(notify)
@@ -185,7 +186,7 @@ export default function TriageBoard({ hidden, onLock }) {
       </div>
     ),
     logs: <LogsView completedLog={board.completedLog} />,
-    settings: <SettingsPanel />,
+    settings: <SettingsPanel settings={settings} onChange={setSettings} />,
   }
 
   return (

@@ -9,11 +9,15 @@
 // - Ids are opaque strings; encode domain meaning in them and parse in onDrop.
 //   onDrop fires only when a drag ends over a zone.
 // - preview renders the floating card that follows the pointer (DragOverlay).
+// - onActiveChange (optional) reports the active drag id (or null) so callers
+//   can render drop-target feedback that depends on WHAT is being dragged.
 // - Pointer drags need 4px of travel before activating, so clicks on buttons
 //   inside a DragHandle still work. Keyboard dragging: focus the handle,
-//   Space/Enter lifts, arrows move, Space/Enter drops.
+//   Space/Enter lifts, arrow keys jump zone to zone, Space/Enter drops.
 // - Zones are never disabled by the engine: whether a drop is *valid* is the
 //   caller's rule to enforce in onDrop (e.g. reject with a toast).
+// - Interactive elements nested inside a DragHandle (menus, overlays) should
+//   stopPropagation on pointerdown/keydown so they don't start a drag.
 import { useState } from 'react'
 import {
   DndContext,
@@ -26,20 +30,68 @@ import {
   useDroppable,
 } from '@dnd-kit/core'
 
-export function DragDropBoard({ onDrop, preview, children }) {
+const ARROW_DIRECTIONS = {
+  ArrowRight: [1, 0],
+  ArrowLeft: [-1, 0],
+  ArrowDown: [0, 1],
+  ArrowUp: [0, -1],
+}
+
+// On arrow press, jump to the nearest drop zone in that direction (dnd-kit's
+// default getter only nudges 25px per press — unusable across a board layout).
+function snapToDroppable(event, { currentCoordinates, context: { collisionRect, droppableRects, droppableContainers } }) {
+  const direction = ARROW_DIRECTIONS[event.code]
+  if (!direction || !collisionRect) return undefined
+  event.preventDefault()
+
+  const [dx, dy] = direction
+  const activeCenter = {
+    x: collisionRect.left + collisionRect.width / 2,
+    y: collisionRect.top + collisionRect.height / 2,
+  }
+
+  let best
+  let bestDistance = Infinity
+  for (const container of droppableContainers.getEnabled()) {
+    const rect = droppableRects.get(container.id)
+    if (!rect) continue
+    const delta = {
+      x: rect.left + rect.width / 2 - activeCenter.x,
+      y: rect.top + rect.height / 2 - activeCenter.y,
+    }
+    // Must lie in the pressed direction (with a small dead zone).
+    if (dx !== 0 && (Math.sign(delta.x) !== dx || Math.abs(delta.x) < 4)) continue
+    if (dy !== 0 && (Math.sign(delta.y) !== dy || Math.abs(delta.y) < 4)) continue
+    const distance = Math.hypot(delta.x, delta.y)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      best = { x: currentCoordinates.x + delta.x, y: currentCoordinates.y + delta.y }
+    }
+  }
+  return best
+}
+
+const POINTER_OPTIONS = { activationConstraint: { distance: 4 } }
+const KEYBOARD_OPTIONS = { coordinateGetter: snapToDroppable }
+
+export function DragDropBoard({ onDrop, preview, onActiveChange, children }) {
   const [activeId, setActiveId] = useState(null)
+  const setActive = (id) => {
+    setActiveId(id)
+    onActiveChange?.(id)
+  }
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor),
+    useSensor(PointerSensor, POINTER_OPTIONS),
+    useSensor(KeyboardSensor, KEYBOARD_OPTIONS),
   )
 
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={({ active }) => setActiveId(String(active.id))}
-      onDragCancel={() => setActiveId(null)}
+      onDragStart={({ active }) => setActive(String(active.id))}
+      onDragCancel={() => setActive(null)}
       onDragEnd={({ active, over }) => {
-        setActiveId(null)
+        setActive(null)
         if (over) onDrop(String(active.id), String(over.id))
       }}
     >

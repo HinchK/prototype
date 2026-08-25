@@ -11,7 +11,8 @@ const displayTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', m
 /** @param {(message: string, tone?: 'success' | 'error' | 'info') => void} notify */
 export function useTriageBoard(notify) {
   const [board, dispatch] = useReducer(boardReducer, undefined, () => createBoard(seedWalkIns()))
-  const poolRef = useRef(shuffle(WALK_IN_POOL))
+  const poolRef = useRef(null)
+  if (poolRef.current === null) poolRef.current = shuffle(WALK_IN_POOL)
 
   useEffect(() => {
     const t = setInterval(() => dispatch({ type: 'clock-ticked' }), 1000)
